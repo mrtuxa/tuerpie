@@ -8,6 +8,4 @@ edition = "2021"
 [dependencies]
 dotenv = "0.15.0"
 dotenv_codegen = "0.15.0"
-gpio = "0.4.1"
 rppal = "0.14.1"
-spaceapi-dezentrale = "0.8.999"
