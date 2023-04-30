@@ -10,7 +10,7 @@ use rppal::gpio::Trigger;
 static OPEN_SPACE: &str = "OpenSpace";
 static CLOSE_SPACE: &str = "CloseSpace";
 static DOOR_PIN: u8 = 13;
-static RECHECK_DELAY: u64 = 30;
+static RECHECK_DELAY: u64 = 30; // ins seconds
 
 fn main() {
     let gpio = Gpio::new().unwrap();
@@ -32,14 +32,13 @@ fn main() {
 
         // make it more reliable and robust
         sleep(Duration::from_secs(RECHECK_DELAY));
-        // ignore all interrupts in these 30 seconds
         // check if the door has still the same status, if not push the new status to the api
-        let new_status = pin.poll_interrupt(true, None).unwrap().unwrap();
-        pin.set_interrupt(Trigger::Both).unwrap();
-        if status != new_status
+        let new_door_open = pin.is_low();
+        if door_open != new_door_open
         {
-            push_door_status(new_status == Level::Low)
+            push_door_status(new_door_open)
         }
+        pin.set_interrupt(Trigger::Both).unwrap();
     }
 }
 
