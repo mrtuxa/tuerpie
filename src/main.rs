@@ -1,31 +1,55 @@
-use rppal::gpio::Trigger;
-use rppal::gpio::{Gpio, Level};
+use std::env;
 use std::process::Command;
+use std::thread::sleep;
+use std::time::Duration;
+
+use rppal::gpio::{Gpio, Level};
+use rppal::gpio::Trigger;
+
+// set your scripts for opening and closing the space here
+static OPEN_SPACE: &str = "OpenSpace";
+static CLOSE_SPACE: &str = "CloseSpace";
+static DOOR_PIN: u8 = 13;
+static RECHECK_DELAY: u64 = 30;
 
 fn main() {
     let gpio = Gpio::new().unwrap();
-    let mut pin = gpio.get(13).unwrap().into_input();
+    let mut pin = gpio.get(DOOR_PIN).unwrap().into_input();
 
     // Set the trigger for the interrupt
     pin.set_interrupt(Trigger::Both).unwrap();
 
     loop {
-        // Wait for an interrupt to occur
-        if let Some(Level::High) = pin.poll_interrupt(true, None).unwrap() {
-            println!("GPIO pin 13 was triggered");
-            Command::new("sh")
-            	.arg("-c")
-            	.arg("SPACEAPI_URL=http://10.131.185.175:8000 API_KEY=not-very-secure ./spaceapi-dezentrale-client open")
-            	.output()
-            	.expect("failed to execute process");
-            // Do something when the interrupt is triggered
-        } else if let Some(Level::Low) = pin.poll_interrupt(true, None).unwrap() {
-            println!("GPIO pin 13 was triggered");
-            Command::new("sh")
-            	.arg("-c")
-            	.arg("SPACEAPI_URL=10.131.185.175:8000 API_KEY=not-very-secure ./spaceapi-dezentrale-client close")
-            	.output()
-            	.expect("failed to execute process");
+        // reading space status from door
+        let status = pin.poll_interrupt(true, None).unwrap().unwrap();
+        pin.clear_interrupt().unwrap();
+        let door_open = status == Level::Low;
+        println!("GPIO pin {} triggered an interrupt", pin.pin());
+        println!("Space is online = {}", door_open);
+
+        println!("GPIO pin {} was triggered", DOOR_PIN);
+        push_door_status(door_open);
+
+        // make it more reliable and robust
+        sleep(Duration::from_secs(RECHECK_DELAY));
+        // ignore all interrupts in these 30 seconds
+        // check if the door has still the same status, if not push the new status to the api
+        let new_status = pin.poll_interrupt(true, None).unwrap().unwrap();
+        pin.set_interrupt(Trigger::Both).unwrap();
+        if status != new_status
+        {
+            push_door_status(new_status == Level::Low)
         }
     }
+}
+
+fn push_door_status(open: bool) {
+    let mut command = Command::new("sh");
+    command
+        .arg("-c")
+        .arg(format!("SPACEAPI_URL={}", env::var("SPACEAPI_URL").unwrap()))
+        .arg(format!("API_KEY={}", env::var("API_KEY").unwrap()));
+    if open { command.arg(OPEN_SPACE); } else { command.arg(CLOSE_SPACE); }
+    command.spawn()
+        .expect("Failed to execute process. Push to api failed");
 }
