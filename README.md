@@ -10,6 +10,3 @@ Please change `DOOR_PIN`, `OPEN_SPACE`, `CLOSE_SPACE` accordingly.
 
 `OPEN_SPACE` and `CLOSE_SPACE` are scripts, that get launched when the corresponding event starts. (They have to inform
 the SPACE_API server about the new status)
-
-You need to provide the environment variables
-`SPACEAPI_URL` and `API_KEY`. They will be passed on to the scripts.
